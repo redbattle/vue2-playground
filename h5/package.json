@@ -28,6 +28,7 @@
   "eslintConfig": {
     "root": true,
     "env": {
+      "amd": true,
       "node": true
     },
     "extends": [
