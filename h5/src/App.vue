@@ -1,17 +1,7 @@
 <template>
   <div id="app">
-    <!-- <img alt="Vue logo" src="./assets/logo.png" />
-    <div style="height: 1000px"></div>
-    <NotifyBtn /> -->
-    <!-- <van-nav-bar
-  title="标题"
-  left-text="返回"
-  right-text="按钮"
-  left-arrow
-/> -->
-
     <RbSlide vertical>
-      <RbSlideItem v-for="item in 11" :key="item" >
+      <RbSlideItem v-for="item in 5" :key="item" >
         <div  :class="'swiper-slide'+item">
           666{{ item }}
         </div>
@@ -75,12 +65,12 @@ export default {
 }
 
 .swiper-slide1,.swiper-slide4,.swiper-slide7,.swiper-slide10 {
-  height: 600px;
+  height: 1000px;
   background-color: #ff0;
 }
 
 .swiper-slide2,.swiper-slide5,.swiper-slide8,.swiper-slide11 {
-  height: 1000px;
+  height: 600px;
   background-color: #0f0;
 }
 </style>

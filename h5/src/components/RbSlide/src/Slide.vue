@@ -1,5 +1,5 @@
 <template>
-  <div class="rb-slide">
+  <div class="rb-slide" v-resize="resize" ref="scrollBox" :style="boxStyle">
     <div ref="track" class="rb-slide-track" :style="this.trackStyle">
       <slot />
     </div>
@@ -7,7 +7,20 @@
 </template>
 
 <script>
-import { on } from "./utils";
+import { on, preventDefault } from "./utils";
+
+import Vue from "vue";
+
+Vue.directive("resize", {
+  inserted: (el, binding) => {
+    let f = (evt) => {
+      if (binding.value(evt, el)) {
+        window.removeEventListener("resize", f);
+      }
+    };
+    window.addEventListener("resize", f);
+  },
+});
 
 function getDirection(x, y) {
   if (x > y) {
@@ -22,13 +35,13 @@ function getDirection(x, y) {
 export default {
   name: "RbSlide",
   props: {
-    vertical: {
-      type: Boolean,
-      default: true,
-    },
     duration: {
       type: [Number, String],
       default: 500,
+    },
+    offsetBottom: {
+      type: String,
+      default: "0px",
     },
   },
   data() {
@@ -43,15 +56,15 @@ export default {
       swiping: false,
       direction: "",
       touchStartTime: 0,
+      boxStyle: {},
     };
   },
   computed: {
     delta() {
-      return this.vertical ? this.deltaY : this.deltaX;
+      return this.deltaY;
     },
     isCorrectDirection() {
-      const expect = this.vertical ? "vertical" : "horizontal";
-      return this.direction === expect;
+      return this.direction === "vertical";
     },
     size() {
       return this.children[this.active].offsetHeight;
@@ -65,13 +78,15 @@ export default {
     trackStyle() {
       const style = {
         transitionDuration: `${this.swiping ? 0 : this.duration}ms`,
-        transform: `translate${this.vertical ? "Y" : "X"}(${this.offset}px)`,
+        transform: `translateY(${this.offset}px)`,
       };
       return style;
     },
   },
   mounted() {
+    this.resize();
     this.bindTouchEvent(this.$refs.track);
+    console.log(window.innerHeight, window.outerHeight);
   },
   methods: {
     initialize() {
@@ -81,7 +96,23 @@ export default {
       this.swiping = true;
     },
     resize() {
-      this.initialize();
+      this.$nextTick(() => {
+        this.boxStyle = {
+          height: `calc(${window.innerHeight}px - ${this.offsetTop(
+            this.$refs["scrollBox"]
+          )}px - ${this.offsetBottom})`,
+        };
+        this.initialize();
+      });
+    },
+    offsetTop(dom, total = 0) {
+      console.log(dom);
+      if (dom?.offsetParent) {
+        total += dom?.offsetTop || 0;
+        return this.offsetTop(dom.offsetParent, total);
+      } else {
+        return total;
+      }
     },
     resetTouchStatus() {
       this.direction = "";
@@ -102,8 +133,10 @@ export default {
     onTouchMove(event) {
       if (!this.swiping) return;
       const touch = event.touches[0];
-      this.deltaX = touch.clientX < 0 ? 0 : touch.clientX - this.startX;
-      this.deltaY = touch.clientY - this.startY;
+      this.deltaX = Math.round(
+        touch.clientX < 0 ? 0 : touch.clientX - this.startX
+      );
+      this.deltaY = Math.round(touch.clientY - this.startY);
       this.offsetX = Math.abs(this.deltaX);
       this.offsetY = Math.abs(this.deltaY);
       const LOCK_DIRECTION_DISTANCE = 10;
@@ -114,6 +147,7 @@ export default {
       ) {
         this.direction = getDirection(this.offsetX, this.offsetY);
       }
+      preventDefault(event, true);
       this.offset = this.currentPosition + this.delta;
     },
     onTouchEnd() {
@@ -126,26 +160,41 @@ export default {
       const rect = this.rectInfo();
       console.log(rect);
       if (rect.height > this.$el.offsetHeight) {
+        // 高度大于一屏
         console.log(this.$el.offsetHeight, rect);
         if (rect.bottom + safeHeight < this.$el.offsetHeight) {
-          this.offset = -(rect.offsetTop + rect.height);
-          this.active++;
+          if (this.active < this.children.length - 1) {
+            this.offset = -(rect.offsetTop + rect.height);
+            this.active++;
+          } else {
+            this.offset = -(
+              rect.offsetTop +
+              rect.height -
+              this.$el.offsetHeight
+            );
+          }
         } else if (
           rect.bottom + safeHeight > this.$el.offsetHeight &&
           rect.bottom < this.$el.offsetHeight
         ) {
           this.offset = -(rect.offsetTop + rect.height - this.$el.offsetHeight);
         } else if (rect.bottom > rect.height + safeHeight) {
-          this.offset = -(rect.offsetTop - this.perSize);
-          this.active--;
+          if (this.active > 0) {
+            this.offset = -(rect.offsetTop - this.perSize);
+            this.active--;
+          } else {
+            this.offset = 0;
+            this.active = 0;
+          }
         } else if (rect.bottom > rect.height) {
           this.offset = -rect.offsetTop;
         } else {
           this.offset = this.currentPosition + this.delta;
         }
       } else if (shouldSwipe && this.isCorrectDirection) {
+        // 高度小于一屏
         if (this.delta < 0) {
-          if (this.active < this.children.length) {
+          if (this.active < this.children.length - 1) {
             this.offset = this.currentPosition - this.size;
             this.active++;
           } else {
@@ -193,20 +242,18 @@ export default {
 
 <style lang="less" scoped>
 .rb-slide {
-  height: 650px;
+  // height: 600px;
   background-color: #ccc;
   position: relative;
-    overflow: hidden;
-    transform: translateZ(0);
-    cursor: grab;
-    user-select: none;
+  overflow: hidden;
+  transform: translateZ(0);
+  user-select: none;
+  // overflow-y: auto;
+  box-sizing: border-box;
 
-
-  &-track{
+  &-track {
     display: flex;
     flex-direction: column;
-    
-
   }
 }
 // @supports (top: constant(safe-area-inset-top)) or
