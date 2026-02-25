@@ -157,10 +157,6 @@ export default {
         this.scroll_right.removeEventListener('scroll', this.handleScrollRight);
         this.scroll_right = null;
       }
-      if (this.scrollTo) {
-        this.scrollTo.destroy();
-        this.scrollTo = null;
-      }
     },
   },
   beforeDestroy() {

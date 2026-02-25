@@ -1,21 +1,25 @@
 <template>
   <div id="app">
     <img alt="Vue logo" src="./assets/logo.png" />
-    <ScrollLink />
+    <WaterMark content="123456" />
   </div>
 </template>
 
 <script>
-import ScrollLink from './components/ScrollLink.vue';
+import WaterMark from '@/components/WaterMark.vue';
+
 export default {
-  name: "App",
-  components: {ScrollLink},
+  name: 'App',
+  components: { WaterMark },
   data() {
     return {
-      content: "",
+      content: '',
     };
   },
   created() {},
+  mounted(){
+    
+  },
   methods: {},
 };
 </script>
