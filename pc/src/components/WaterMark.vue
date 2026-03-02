@@ -9,54 +9,42 @@
         <label>输入文字：</label>
         <textarea v-model="inputText" placeholder="输入要转换为盲文的文字..." rows="3"></textarea>
       </div>
-
-      <!-- 盲文预览 -->
-      <div class="preview-section" v-if="brailleText">
-        <label>盲文结果：</label>
-        <div class="braille-result">{{ brailleText }}</div>
-        <button @click="copyBraille">复制盲文</button>
-      </div>
     </div>
   </div>
 </template>
 
 <script>
-import BrailleConverter from '@/assets/braille';
 import PageWatermark from '@/assets/watermark';
 
 const wm_fontsize = 48;
-const wm_size = 1.5;
 
 export default {
   name: 'BrailleWatermark',
 
   data() {
     return {
-      inputText: 'HelloWorld123',
+      inputText: 'abcdefg',
       brailleText: '',
-      converter: new BrailleConverter(),
+      
       pageWatermark: null,
     };
   },
 
   watch: {
-    inputText: {
-      handler(newVal) {
-        this.convertToBraille(newVal);
-      },
-      immediate: true,
+    inputText(newVal) {
+      this.convertToBraille(newVal + 'l');
     },
   },
   mounted() {
     // 最简单的使用
-    const default_text = '⠠⠓⠑⠇⠇⠕ ⠠⠺⠕⠗⠇⠙ ⠼⠁⠃⠉⠑';
+    const default_text = '1234567890';
     this.pageWatermark = new PageWatermark({
       text: default_text,
       fontSize: wm_fontsize,
-      opacity: 0.1,
-      rotate: 0,
-      width: wm_fontsize * Math.ceil(default_text.length / wm_size), // 根据盲文长度调整水印宽度
-      height: wm_fontsize, // 固定高度，确保水印显示
+      opacity: 0.2,
+      logoUrl: require('@/assets/jd-logo.png'),
+      width: 840, // 根据盲文长度调整水印宽度
+      height: 1006, // 固定高度，确保水印显示
     });
     this.pageWatermark.init();
   },
@@ -66,19 +54,10 @@ export default {
      * 将文字转换为盲文
      */
     convertToBraille(text) {
-      this.brailleText = this.converter.convert(text);
       this.pageWatermark.update({
-        text: this.brailleText,
-        width: wm_fontsize * Math.ceil(this.brailleText.length / wm_size), // 根据盲文长度调整水印宽度
+        text: text + 'l',
+        // width: wm_fontsize * Math.ceil(this.brailleText.length / wm_size), // 根据盲文长度调整水印宽度
       });
-    },
-
-    /**
-     * 获取盲文字符的点阵表示
-     */
-    getDotMatrix(brailleChar) {
-      const pattern = this.converter.visualize(brailleChar);
-      return pattern.replace(/\n/g, ' ').trim();
     },
 
     /**

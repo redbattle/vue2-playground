@@ -1,24 +1,25 @@
 // watermark.js
+import BrailleConverter from '@/assets/braille';
+const converter = new BrailleConverter();
 class PageWatermark {
   // default configuration shared across instances
   static get DEFAULTS() {
     return {
-      text: '机密文件',           // 水印文字
-      subtext: '',               // 副水印文字
-      fontSize: 16,              // 字体大小
+      text: '机密文件', // 水印文字
+      fontSize: 16, // 字体大小
       fontFamily: 'Microsoft YaHei, Arial, sans-serif',
-      color: 'rgba(0, 0, 0, 0.1)', // 水印颜色
-      rotate: 30,                 // 旋转角度
-      gap: 100,                   // 水印间距
-      opacity: 0.1,               // 透明度（仅应用于color alpha 或样式透明度之一）
-      zIndex: 999999,             // 层级
-      container: document.body,    // 容器
-      width: 200,                 // 单个水印宽度
-      height: 100,                // 单个水印高度
-      observe: true,              // 是否监听DOM变化
-      onRemove: null,             // 水印被移除时的回调
-      dynamicInfo: null,          // 动态信息（用户ID、时间等）
-      stagger: true               // 平铺时每行交错错开
+      color: 'rgba(255, 255, 255, 0.4)', // 水印颜色
+      opacity: 0.1, // 支持通过CSS opacity 控制整体透明度（与 color alpha 可叠加）
+      zIndex: 999999, // 层级
+      container: document.body, // 容器
+      width: 200, // 单个水印宽度
+      height: 100, // 单个水印高度
+      observe: true, // 是否监听DOM变化
+      onRemove: null, // 水印被移除时的回调
+      dynamicInfo: null, // 动态信息（用户ID、时间等）
+      logoUrl: null, // 可选：水印中显示的logo图片URL
+      logoPadding: 0, // logo与文字之间的间距，默认 0 为无间距
+      // no tiling: watermark rendered once per container
     };
   }
 
@@ -27,6 +28,7 @@ class PageWatermark {
     this.watermarkElement = null;
     this.observer = null;
     this.intervalId = null;
+    this.logoImg = null;
   }
 
   /**
@@ -45,58 +47,152 @@ class PageWatermark {
    * 创建水印
    */
   createWatermark() {
-    // measure actual text width so stagger works with dynamic content
+    // if logo url provided but image not loaded yet, load asynchronously and redraw
+    if (this.options.logoUrl && !this.logoImg) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        this.logoImg = img;
+        this.createWatermark();
+      };
+      img.src = this.options.logoUrl;
+      return;
+    }
+
+    // measure actual text width for proper sizing of single watermark
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     ctx.font = `${this.options.fontSize}px ${this.options.fontFamily}`;
 
     const mainText = this.getWatermarkText();
-    const metrics = ctx.measureText(mainText);
-    let measuredW = metrics.width;
+    // split text into individual characters for separate placement
+    const chars = Array.from(mainText);
+    // const chars = [];
+    // for (let i = 0; i < 100; i++) {
+    //   chars.push(i + '');
+    // }
 
-    if (this.options.subtext) {
-      ctx.font = `${this.options.fontSize * 0.8}px ${this.options.fontFamily}`;
-      measuredW = Math.max(measuredW, ctx.measureText(this.options.subtext).width);
+    // compute height of text block (using font size)
+    let textHeight = this.options.fontSize;
+
+    // logo does not affect measured width/height directly;
+    // watermark tile size will be used to scale logo later
+
+    // ensure width/height respect configured minimums
+    const baseW = Math.max(this.options.width, 0);
+    let baseH = Math.max(this.options.height, 0);
+
+    // determine scaled logo dimensions which will fill the tile while preserving aspect
+    let logoDrawW = 0;
+    let logoDrawH = 0;
+    if (this.logoImg) {
+      const iw = this.logoImg.width;
+      const ih = this.logoImg.height;
+      const tileRatio = baseW / baseH;
+      const imgRatio = iw / ih;
+      if (tileRatio > imgRatio) {
+        // tile is wider - scale by width
+        logoDrawW = baseW;
+        logoDrawH = baseW / imgRatio;
+      } else {
+        // tile is taller - scale by height
+        logoDrawH = baseH;
+        logoDrawW = baseH * imgRatio;
+      }
     }
 
-    // ensure width is at least the configured value
-    const baseW = Math.max(this.options.width, measuredW);
-    const baseH = this.options.height;
-
     // update stored width so future calls stay in sync
-    this.options.width = baseW;
-
-    const tileW = this.options.stagger ? baseW * 2 : baseW;
-    const tileH = this.options.stagger ? baseH * 2 : baseH;
+    // this.options.width = baseW;
 
     // prepare canvas with final tile size
-    canvas.width = tileW;
-    canvas.height = tileH;
-    ctx.clearRect(0, 0, tileW, tileH);
+    canvas.width = baseW;
+    canvas.height = baseH;
+    ctx.clearRect(0, 0, baseW, baseH);
 
-    // draw helper function
+    // draw helper function (center the content at cx,cy)
     const drawOnce = (cx, cy) => {
       ctx.save();
       ctx.translate(cx, cy);
-      ctx.rotate((this.options.rotate * Math.PI) / 180);
+
+      // draw logo scaled to tile
+      if (this.logoImg) {
+        ctx.drawImage(this.logoImg, -logoDrawW / 2, -logoDrawH / 2, logoDrawW, logoDrawH);
+      }
+
+      ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.font = `${this.options.fontSize}px ${this.options.fontFamily}`;
       ctx.fillStyle = this.options.color;
       ctx.globalAlpha = 1;
-      ctx.fillText(mainText, 0, 0);
-      if (this.options.subtext) {
-        ctx.font = `${this.options.fontSize * 0.8}px ${this.options.fontFamily}`;
-        ctx.fillText(this.options.subtext, 0, this.options.fontSize);
-      }
+      // draw each char spaced horizontally
+      // let yOffset = -baseH / 2;
+      console.log(1111, chars, baseW, baseH);
+      chars.forEach((ch, idx) => {
+        // 1
+        if (idx < 16) {
+          ctx.fillText(ch, -baseW / 2 + textHeight * ((idx % 2) + 1) - 10, -baseH / 2 + textHeight + idx * textHeight);
+        } else if (idx < 25) {
+          let x = textHeight * 1.5 * Math.floor((idx - 15) / 2);
+          let y = textHeight * (0.4 * (idx - 15) + Math.floor((idx - 15) % 2));
+          ctx.fillText(ch, -baseW / 2 + textHeight * 2 + 10 + x, -baseH / 2 + 16 * textHeight + y);
+        } else if (idx < 32) {
+          let x = textHeight * 1.5 * Math.floor((idx - 15) / 2);
+          let y = textHeight * (0.4 * (31 - idx) + Math.floor((idx - 31) % 2)) + textHeight * 2.4;
+          ctx.fillText(ch, -baseW / 2 + textHeight * 2 + 10 + x, -baseH / 2 + 16 * textHeight + y - 10);
+        } else if (idx < 36) {
+          let x = textHeight * 1.3 * Math.floor((idx - 15) / 2);
+          let y = textHeight * (0.6 * (32 - idx) + Math.floor((idx - 32) % 2)) + textHeight;
+          ctx.fillText(ch, -baseW / 2 + textHeight * 2 + 60 + x, -baseH / 2 + 16 * textHeight + y - 20);
+        } else if (idx < 38) {
+          let x = textHeight * 1.2 * Math.floor((idx - 15) / 2);
+          let y = textHeight * (0.6 * (36 - idx) + Math.floor((idx - 36) % 2)) + textHeight;
+          ctx.fillText(ch, -baseW / 2 + textHeight * 2 + 60 + x, -baseH / 2 + 16 * textHeight + y - 150);
+        } else if (idx < 40) {
+          let x = textHeight * 1.2 * Math.floor((idx - 15) / 2);
+          let y = textHeight * (0.6 * (36 - idx) + Math.floor((idx - 36) % 2)) + textHeight;
+          ctx.fillText(ch, -baseW / 2 + textHeight * 2 + 20 + x, -baseH / 2 + 16 * textHeight + y - 150);
+        } else if (idx < 47) {
+          ctx.fillText(
+            ch,
+            -baseW / 4 + textHeight * ((idx % 2) + 1) - 60,
+            -baseH / 2 + textHeight + (idx - 40) * textHeight - 20,
+          );
+        } else if (idx < 54) {
+          ctx.fillText(
+            ch,
+            baseW / 4 + textHeight * ((idx % 2) + 1) - 76,
+            -baseH / 2 + textHeight + (idx - 47) * textHeight - 20,
+          );
+        } else if (idx < 61) {
+          ctx.fillText(
+            ch,
+            baseW / 2 + textHeight * ((idx % 2) + 1) - 124,
+            -baseH / 2 + textHeight + (idx - 54) * textHeight - 20,
+          );
+        } else if (idx < 64) {
+          ctx.fillText(ch, baseW / 4 + textHeight * (61 - idx) * 1.2, (61 - idx) * textHeight * 1.2 - 80);
+        } else if (idx < 68) {
+          ctx.fillText(ch, baseW / 4 + textHeight * (64 - idx) - 80, (64 - idx) * textHeight - 20);
+        } else if (idx < 74) {
+          let x = -textHeight * 1.5 * Math.floor((idx - 68) / 2);
+          let y = -textHeight * (0.6 * (68 - idx) - Math.floor((idx - 68) % 2)) + textHeight * 2.4;
+          ctx.fillText(ch, -baseW / 4 + 120 + x, -baseH / 4 + y - 0);
+        } else if (idx < 82) {
+          let x = textHeight * 1.5 * Math.floor((idx - 74) / 2);
+          let y = -textHeight * (0.5 * (73 - idx) - Math.floor((idx - 74) % 2)) + textHeight * 2.4;
+          ctx.fillText(ch, -baseW / 4 + 0 + x, -baseH / 4 + y + 200);
+        } else if (idx < 88) {
+          let x = textHeight * 1.5 * Math.floor((idx - 82) / 2);
+          let y = textHeight * (0.5 * (82 - idx) - Math.floor((idx - 82) % 2));
+          ctx.fillText(ch, -baseW / 4 + 280 + x, -baseH / 4 + y + 500);
+        }
+      });
       ctx.restore();
     };
 
-    // always draw base watermark in first quadrant
+    // single watermark centered inside the tile
     drawOnce(baseW / 2, baseH / 2);
-    if (this.options.stagger) {
-      drawOnce(baseW + baseW / 2, baseH + baseH / 2);
-    }
 
     const base64Data = canvas.toDataURL('image/png');
 
@@ -115,8 +211,10 @@ class PageWatermark {
       pointer-events: none;
       z-index: ${this.options.zIndex};
       background-image: url(${base64Data});
-      background-repeat: repeat;
-      background-size: ${tileW}px ${tileH}px;
+      background-repeat: no-repeat;
+      background-position: center center;
+      background-size: ${this.options.width}px ${this.options.height}px;
+      opacity: ${this.options.opacity};
     `;
 
     this.watermarkElement.style.cssText = style;
@@ -128,9 +226,9 @@ class PageWatermark {
   getWatermarkText() {
     if (typeof this.options.dynamicInfo === 'function') {
       const info = this.options.dynamicInfo();
-      return `${this.options.text} ${info}`;
+      return `${converter.convert(this.options.text)} ${info}`;
     }
-    return this.options.text;
+    return converter.convert(this.options.text, 88);
   }
 
   /**
@@ -154,7 +252,7 @@ class PageWatermark {
     this.observer.observe(this.options.container, {
       attributes: true,
       childList: true,
-      subtree: true
+      subtree: true,
     });
   }
 
@@ -167,7 +265,6 @@ class PageWatermark {
     }
   }
 
-
   /**
    * 水印被移除时的处理
    */
@@ -176,10 +273,10 @@ class PageWatermark {
     if (this.options.onRemove) {
       this.options.onRemove();
     }
-    
+
     // 重新创建水印（防删除）
     this.init();
-    
+
     // 可以在这里发送日志到服务器
     console.warn('水印被尝试移除，已自动恢复');
   }
@@ -221,7 +318,11 @@ class PageWatermark {
    * 更新水印配置
    */
   update(options = {}) {
+    const prevLogo = this.options.logoUrl;
     Object.assign(this.options, options);
+    if (options.logoUrl && options.logoUrl !== prevLogo) {
+      this.logoImg = null; // force re-load
+    }
     this.init();
   }
 }
