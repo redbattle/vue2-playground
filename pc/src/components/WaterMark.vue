@@ -32,7 +32,7 @@ export default {
 
   watch: {
     inputText(newVal) {
-      this.convertToBraille(newVal + 'l');
+      this.convertToBraille(newVal);
     },
   },
   mounted() {
@@ -41,7 +41,7 @@ export default {
     this.pageWatermark = new PageWatermark({
       text: default_text,
       fontSize: wm_fontsize,
-      opacity: 0.2,
+      opacity: 0.1,
       logoUrl: require('@/assets/jd-logo.png'),
       width: 840, // 根据盲文长度调整水印宽度
       height: 1006, // 固定高度，确保水印显示

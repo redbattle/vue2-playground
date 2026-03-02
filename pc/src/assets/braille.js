@@ -57,8 +57,8 @@ class BrailleConverter {
     };
 
     // random letter generator from k..z
-    const randLetters = 'kmnopqrstuvwxyz';
-    const randLetter = () => randLetters[Math.floor(Math.random() * randLetters.length)];
+    // const randLetters = 'kmnopqrstuvwxyz';
+    // const randLetter = () => randLetters[Math.floor(Math.random() * randLetters.length)];
 
     // Build base output with random insertions between characters
     for (let i = 0; i < text.length; i++) {
@@ -67,11 +67,11 @@ class BrailleConverter {
       charsOut.push(b);
 
       // insert 1 or 2 random letters (converted to braille)
-      const count = Math.random() < 0.5 ? 1 : 2;
-      for (let k = 0; k < count; k++) {
-        const r = randLetter();
-        charsOut.push(toBraille(r));
-      }
+      // const count = Math.random() < 0.5 ? 1 : 2;
+      // for (let k = 0; k < count; k++) {
+      //   const r = randLetter();
+      //   charsOut.push(toBraille(r));
+      // }
     }
 
     // If fixedLength provided, pad by cycling the current sequence or truncate

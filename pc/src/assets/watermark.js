@@ -8,7 +8,7 @@ class PageWatermark {
       text: '机密文件', // 水印文字
       fontSize: 16, // 字体大小
       fontFamily: 'Microsoft YaHei, Arial, sans-serif',
-      color: 'rgba(255, 255, 255, 0.4)', // 水印颜色
+      color: 'rgba(255, 255, 255, 0.5)', // 水印颜色
       opacity: 0.1, // 支持通过CSS opacity 控制整体透明度（与 color alpha 可叠加）
       zIndex: 999999, // 层级
       container: document.body, // 容器
