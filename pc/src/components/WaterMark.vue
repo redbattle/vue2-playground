@@ -43,8 +43,8 @@ export default {
       fontSize: wm_fontsize,
       opacity: 0.1,
       logoUrl: require('@/assets/jd-logo.png'),
-      width: 840, // 根据盲文长度调整水印宽度
-      height: 1006, // 固定高度，确保水印显示
+      width: 880, // 根据盲文长度调整水印宽度
+      height: 1012, // 固定高度，确保水印显示
     });
     this.pageWatermark.init();
   },
